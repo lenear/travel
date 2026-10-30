@@ -466,70 +466,11 @@ class PromptBuilder:
         Raises:
             ValueError: 无法得到合法行程JSON、约束检查不通过、或用户明确要求的工具始终未被执行时抛出
         """
-        try:
-            max_tool_rounds = int(max_tool_rounds)
-        except (TypeError, ValueError):
-            max_tool_rounds = MAX_TOOL_ROUNDS
-        max_tool_rounds = max(0, min(max_tool_rounds, MAX_TOOL_ROUNDS))
+        # 局部导入避免 agent_graph 复用本模块工具辅助函数时产生循环导入。
+        from agent_graph import run_agent
 
-        tool_schemas = self._build_tool_schemas()
-        required_tools = self._detect_required_tools(messages)
-        called_tools = self._called_tools_in_messages(messages)
-
-        # 允许模型调用工具的轮次
-        for round_index in range(max_tool_rounds):
-            message = self._call_model(messages, tools=tool_schemas)
-            content = _field(message, "content", "") or ""
-            tool_calls = self._normalize_tool_calls(_field(message, "tool_calls", []))
-
-            if not tool_calls:
-                # 记录这一版回答，约束检查失败时便于把问题反馈给模型重规划
-                messages.append({"role": "assistant", "content": content})
-                missing = self._missing_required_tools(required_tools, called_tools)
-                if not missing:
-                    return self._finalize_itinerary(content, user_input)
-                if round_index + 1 >= max_tool_rounds:
-                    # 没有轮次可以补调了，交给循环后面的检查统一报错
-                    break
-                # 不接受这一版最终JSON：先把缺失的工具告诉模型，再继续原有工具调用循环
-                print(f"[工具要求] 模型未调用用户明确要求的工具：{'、'.join(missing)}，已要求补调后再输出")
-                messages.append({
-                    "role": "user",
-                    "content": MISSING_TOOLS_TEMPLATE.format(missing="、".join(missing))
-                })
-                continue
-
-            # 记录模型的工具调用意图，保持对话完整
-            messages.append({
-                "role": "assistant",
-                "content": content,
-                "tool_calls": tool_calls
-            })
-            print(f"[工具调用] 第{round_index + 1}轮：{[call['function']['name'] for call in tool_calls]}")
-
-            # 执行工具（单轮最多MAX_TOOL_CALLS_PER_ROUND个，其余返回错误提示）
-            for index, tool_call in enumerate(tool_calls):
-                if index >= MAX_TOOL_CALLS_PER_ROUND:
-                    messages.append(self._tool_message(tool_call["id"], {
-                        "ok": False,
-                        "error": f"单轮工具调用数量超过上限（{MAX_TOOL_CALLS_PER_ROUND}个），该调用未执行"
-                    }))
-                    continue
-                # 执行过就算已调用（ok=False也算），避免对同一个工具反复要求
-                called_tools.append(tool_call["function"]["name"])
-                messages.append(self._execute_tool_call(tool_call))
-        else:
-            # 轮次用尽：不再提供工具，要求模型基于已有信息给出最终JSON
-            if not self._missing_required_tools(required_tools, called_tools):
-                print(f"[工具调用] 已达到{max_tool_rounds}轮上限，请求模型直接输出最终行程")
-                final_message = self._call_model(messages)
-                final_content = _field(final_message, "content", "") or ""
-                messages.append({"role": "assistant", "content": final_content})
-                return self._finalize_itinerary(final_content, user_input)
-
-        # 轮次用尽，用户明确要求的工具始终没有被执行，不返回行程
-        missing = self._missing_required_tools(required_tools, called_tools)
-        raise ValueError(f"模型未执行用户明确要求的工具：{'、'.join(missing)}")
+        raw_text = run_agent(self, messages, max_tool_rounds)
+        return self._finalize_itinerary(raw_text, user_input)
 
     def _run_model_with_replan(self, messages: List[Dict[str, Any]], user_input: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -1069,3 +1010,4 @@ class PromptBuilder:
         messages = self.build_optimization_messages(user_input, previous_plan, feedback,
                                                     memory_context=memory_context)
         return self._run_model_with_replan(messages, user_input)
+

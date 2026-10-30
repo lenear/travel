@@ -92,18 +92,12 @@ class TestDirectAnswer(unittest.TestCase):
         self.assertEqual(msgs[-1]["content"], final_text)
 
     def test_zero_tool_rounds(self):
-        """max_tool_rounds=0 → 模型有 tool_calls 也不走工具，直接 final_answer"""
-        tool_calls = [_tool_call_dict("search_poi", '{"keyword": "故宫", "city": "北京"}')]
-        # 第一次返回 tool_calls，第二次返回纯文本
-        builder = _make_builder([
-            _assistant_msg(content="", tool_calls=tool_calls),
-            _assistant_msg(content="最终回答"),
-        ])
-
+        """max_tool_rounds=0 → 不提供工具，只调用一次模型"""
+        builder = _make_builder([_assistant_msg(content="最终回答")])
         answer = run_agent(builder, [{"role": "user", "content": "测试"}], max_tool_rounds=0)
         self.assertEqual(answer, "最终回答")
-        # 第一次 call_model + 一次 final_answer = 2 次
-        self.assertEqual(builder._call_model.call_count, 2)
+        self.assertEqual(builder._call_model.call_count, 1)
+        self.assertNotIn("tools", builder._call_model.call_args.kwargs)
 
 
 # ---------- 路径 2：调用工具后回答 ----------
@@ -282,3 +276,4 @@ class TestStateAndLimits(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

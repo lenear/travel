@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能旅游行程规划</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3366FF;
+            --secondary-color: #F5F7FA;
+            --text-color: #2C3E50;
+            --border-color: #E5E9F2;
+            --success-color: #67C23A;
+            --warning-color: #E6A23C;
+            --danger-color: #F56C6C;
+            --border-radius: 8px;
+            --box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            color: var(--text-color);
+            background-color: #F8FAFC;
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: auto;
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .form-container {
+            flex: 1;
+            min-width: 320px;
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .map-container {
+            flex: 1;
+            min-width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 2rem;
+            font-size: 2rem;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        /* 隐藏数字输入框的上下调节按钮 */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(51,102,255,0.2);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #2952CC;
+            transform: translateY(-1px);
+        }
+
+        .result-container {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--secondary-color);
+            border-radius: var(--border-radius);
+        }
+
+        .conditions-list {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 1.5rem;
+        }
+
+        .conditions-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .conditions-list li:last-child {
+            border-bottom: none;
+        }
+
+        textarea[readonly] {
+            background-color: white;
+            resize: vertical;
+            min-height: 200px;
+            margin: 1rem 0;
+        }
+
+        #container {
+            flex: 1;
+            min-height: 500px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+
+        .day-selector {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 1rem;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+
+        .day-selector button {
+            flex: 1;
+            min-width: 100px;
+            max-width: 150px;
+            background-color: white;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+        }
+
+        .day-selector button:hover {
+            background-color: var(--secondary-color);
+            transform: none;
+        }
+
+        .day-selector button.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .feedback-container {
+            margin-top: 2rem;
+        }
+
+        .feedback-container textarea {
+            margin: 1rem 0;
+        }
+
+        .amap-info-content {
+            padding: 1rem;
+            max-width: 300px;
+        }
+
+        .info-window {
+            padding: 0.5rem;
+        }
+
+        .info-window h4 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .info-window p {
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+
+        /* 地图标记标签样式 */
+        .amap-marker-label {
+            border: none;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 3px 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            font-size: 12px;
+            color: var(--text-color);
+        }
+
+        .location-marker {
+            position: relative;
+            text-align: center;
+        }
+
+        .marker-number {
+            background-color: var(--primary-color);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: 2px solid white;
+        }
+
+        .marker-name {
+            position: absolute;
+            white-space: nowrap;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .form-container,
+            .map-container {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h1>智能旅游行程规划</h1>
+            <form method="post">
+                <div class="form-group">
+                    <label>目的地</label>
+                    <input type="text" name="destination" required placeholder="请输入目的地城市">
+                </div>
+                
+                <div class="form-group">
+                    <label>出行日期</label>
+                    <div style="display: flex; gap: 1rem;">
+                        <div style="flex: 1;">
+                            <input type="date" name="start_date" required>
+                        </div>
+                        <div style="flex: 1;">
+                            <input type="date" name="end_date" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>总预算（元）</label>
+                    <input type="number" name="budget" min="0" required placeholder="请输入预算金额">
+                </div>
+
+                <div class="form-group">
+                    <label>出行人数</label>
+                    <input type="number" name="people" min="1" value="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label>旅行偏好</label>
+                    <input type="text" name="preferences" placeholder="例如: 美食, 博物馆, 自然风光（用逗号分隔）">
+                </div>
+
+                <button type="submit">生成行程</button>
+            </form>
+
+            {% if error_message %}
+            <div class="result-container" style="border: 1px solid #F56C6C; background: #FFF5F5;">
+                <p style="color: #F56C6C; font-weight: 500;">{{ error_message }}</p>
+            </div>
+            {% endif %}
+
+            {% if itinerary %}
+            <div class="result-container">
+                <h2>行程条件</h2>
+                <ul class="conditions-list">
+                    <li><strong>目的地：</strong>{{ request.form.get('destination') }}</li>
+                    <li><strong>出发日期：</strong>{{ request.form.get('start_date') }}</li>
+                    <li><strong>结束日期：</strong>{{ request.form.get('end_date') }}</li>
+                    <li><strong>预算：</strong>{{ request.form.get('budget') }} 元</li>
+                    <li><strong>人数：</strong>{{ request.form.get('people') }} 人</li>
+                    <li><strong>偏好：</strong>{{ request.form.get('preferences') }}</li>
+                </ul>
+
+                <h2>行程安排</h2>
+                <textarea id="itineraryText" readonly>{{ itinerary_text }}</textarea>
+
+                <div id="weatherAdviceContainer"></div>
+
+                <div class="feedback-container">
+                    <h3>行程反馈</h3>
+                    <form method="post">
+                        <input type="hidden" name="destination" value="{{ request.form.get('destination') }}">
+                        <input type="hidden" name="start_date" value="{{ request.form.get('start_date') }}">
+                        <input type="hidden" name="end_date" value="{{ request.form.get('end_date') }}">
+                        <input type="hidden" name="budget" value="{{ request.form.get('budget') }}">
+                        <input type="hidden" name="people" value="{{ request.form.get('people') }}">
+                        <input type="hidden" name="preferences" value="{{ request.form.get('preferences') }}">
+                        <input type="hidden" name="itinerary" id="itineraryJson" value='{{ itinerary | tojson }}'>
+                        <textarea name="feedback" placeholder="请留下您的反馈意见，我们将根据您的建议优化行程"></textarea>
+                        <button type="submit" name="action" value="optimize">优化行程</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if itinerary %}
+        <div class="map-container">
+            <div id="container"></div>
+            <div class="day-selector" id="daySelector"></div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if itinerary %}
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key={{ amap_key }}"></script>
+    <script>
+        let map = null;
+        let markers = [];
+        let polyline = null;
+        let allDaysData = [];
+
+        // 初始化地图
+        function initMap() {
+            map = new AMap.Map('container', {
+                zoom: 11,
+                viewMode: '3D'
+            });
+        }
+
+        // 清除地图上的所有标记和路线
+        function clearMap() {
+            if (markers.length > 0) {
+                map.remove(markers);
+                markers = [];
+            }
+            if (polyline) {
+                map.remove(polyline);
+                polyline = null;
+            }
+        }
+
+        // 显示特定天数的行程和天气
+        function showDayItinerary(dayIndex) {
+            clearMap();
+            const dayData = allDaysData[dayIndex];
+            const locations = dayData.locations;
+            const weather = dayData.weather;
+            
+            // 展示天气信息和建议
+            const weatherAdviceContainer = document.getElementById('weatherAdviceContainer');
+            if (weather) {
+                let advice = '';
+                if (weather.dayweather && weather.dayweather.includes('雨')) {
+                    advice = '建议携带雨具，注意防滑。';
+                } else if (weather.dayweather && weather.dayweather.includes('雪')) {
+                    advice = '注意保暖，出行注意安全。';
+                } else if (weather.dayweather && weather.dayweather.includes('晴')) {
+                    advice = '注意防晒，多补充水分。';
+                } else if (weather.dayweather && weather.dayweather.includes('阴')) {
+                    advice = '天气较为阴沉，适合室内活动。';
+                } else {
+                    advice = '请根据天气合理安排行程。';
+                }
+                weatherAdviceContainer.innerHTML = `
+                    <div class="result-container" style="border:2px solid #E6A23C; background:#FFFBEA;">
+                        <h3>当天天气</h3>
+                        <p><strong>天气：</strong>${weather.dayweather || ''}</p>
+                        <p><strong>温度：</strong>${(weather.nighttemp && weather.daytemp) ? (weather.nighttemp + '~' + weather.daytemp + '℃') : ''}</p>
+                        <p><strong>风向：</strong>${weather.daywind || ''}${weather.daypower ? ('，' + weather.daypower + '级') : ''}</p>
+                        <p style="color:#D35400;font-weight:bold;font-size:1.1em;"><strong>建议：</strong>${advice}</p>
+                    </div>
+                `;
+            } else {
+                weatherAdviceContainer.innerHTML = '<div class="result-container"><p>暂无天气信息</p></div>';
+            }
+
+            if (!locations || locations.length === 0) return;
+
+            // 添加标记
+            locations.forEach((loc, index) => {
+                const marker = new AMap.Marker({
+                    position: new AMap.LngLat(loc.location[0], loc.location[1]),
+                    title: loc.name,
+                    label: {
+                        content: `${index + 1}. ${loc.name}`,
+                        direction: 'top'
+                    }
+                });
+
+                const infoContent = `
+                    <div class="info-window">
+                        <h4>${index + 1}. ${loc.name}</h4>
+                        <p><strong>地址：</strong>${loc.address || '暂无地址信息'}</p>
+                        <p><strong>类型：</strong>${loc.type || '暂无类型信息'}</p>
+                        ${loc.time_block ? `<p><strong>时间：</strong>${loc.time_block}</p>` : ''}
+                    </div>
+                `;
+
+                const info = new AMap.InfoWindow({
+                    content: infoContent,
+                    offset: new AMap.Pixel(0, -30)
+                });
+
+                marker.on('click', () => {
+                    info.open(map, marker.getPosition());
+                });
+
+                markers.push(marker);
+            });
+
+            // 添加路线
+            const path = locations.map(loc => new AMap.LngLat(loc.location[0], loc.location[1]));
+            polyline = new AMap.Polyline({
+                path: path,
+                strokeColor: '#3366FF',
+                strokeWeight: 6,
+                strokeOpacity: 0.9,
+                showDir: true,
+                dirColor: 'white'
+            });
+
+            map.add(markers);
+            map.add(polyline);
+            
+            // 调整视图以包含所有标记
+            map.setFitView();
+        }
+
+        // 创建日期选择按钮
+        function createDayButtons(daysCount) {
+            const container = document.getElementById('daySelector');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < daysCount; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = `第${i + 1}天`;
+                btn.onclick = () => {
+                    container.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    showDayItinerary(i);
+                };
+                if (i === 0) {
+                    btn.classList.add('active');
+                }
+                container.appendChild(btn);
+            }
+        }
+
+        // 初始化地图
+        initMap();
+
+        // 获取行程地点和天气数据（直接发送完整行程JSON，后端不再用大模型提取地点）
+        fetch('/get_locations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                itinerary: JSON.parse(document.getElementById('itineraryJson').value),
+                destination: '{{ request.form.get('destination') }}',
+                start_date: '{{ request.form.get('start_date') }}'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            allDaysData = data;
+            createDayButtons(data.length);
+            if (data.length > 0) {
+                showDayItinerary(0);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    </script>
+    {% endif %}
+</body>
+</html>
